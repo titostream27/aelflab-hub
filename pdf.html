@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Editor — AelfLab Hub</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0b0d15;color:#e2e8f0;min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.header h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header a{color:#64748b;text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid #1e293b}
+.header a:hover{background:#1e293b;color:#e2e8f0}
+.card{background:#12151f;border:1px solid #1e293b;border-radius:12px;padding:18px;margin-bottom:14px}
+.card h3{font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:768px){.row{grid-template-columns:1fr}}
+
+.drop-zone{border:2px dashed #1e293b;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:.3s;color:#64748b}
+.drop-zone:hover,.drop-zone.dragover{border-color:#00d4ff;background:#00d4ff08;color:#e2e8f0}
+.drop-zone .icon{font-size:40px;margin-bottom:6px}
+.drop-zone .sub{font-size:11px;color:#475569;margin-top:3px}
+
+.file-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.file-pill{background:#1e293b;padding:4px 10px;border-radius:6px;font-size:11px;display:flex;align-items:center;gap:5px}
+.file-pill .del{cursor:pointer;color:#ef4444;font-weight:700}
+
+.progress-wrap{background:#1e293b;border-radius:8px;height:6px;margin-top:8px;overflow:hidden;display:none}
+.progress-bar{height:100%;width:0;background:linear-gradient(135deg,#00d4ff,#7b2ff7);transition:width .3s}
+
+.btn{display:inline-block;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:.2s}
+.btn-primary{background:linear-gradient(135deg,#00d4ff,#7b2ff7);color:#fff}
+.btn-primary:hover{opacity:.9}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-outline{background:transparent;border:1px solid #1e293b;color:#94a3b8}
+.btn-outline:hover{background:#1e293b;color:#e2e8f0}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-warning{background:#f59e0b;color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+input,select,textarea{width:100%;padding:7px 10px;background:#0b0d15;border:1px solid #1e293b;border-radius:8px;color:#e2e8f0;font-size:12px;outline:none;margin-bottom:6px}
+input:focus,select:focus{border-color:#00d4ff}
+textarea{min-height:80px;font-family:monospace;font-size:11px}
+.form-row{display:flex;gap:6px;align-items:end;margin-bottom:6px}
+.form-row>*{flex:1}
+
+.result-box{background:#0b0d15;border:1px solid #1e293b;border-radius:8px;padding:10px;margin-top:6px;font-size:12px;max-height:240px;overflow:auto;white-space:pre-wrap}
+.success{color:#22c55e;font-weight:600}
+.error{color:#ef4444;font-weight:600}
+.warning{color:#f59e0b;font-weight:600}
+
+/* Preview canvas area */
+.preview-container{position:relative;display:inline-block;border:1px solid #1e293b;border-radius:8px;overflow:hidden;background:#000;margin:10px 0}
+.preview-container canvas{display:block}
+.overlay{position:absolute;top:0;left:0;pointer-events:none}
+.overlay.active{pointer-events:auto}
+
+.sig-drag{cursor:move;border:2px dashed #00d4ff;position:absolute;opacity:0.9;z-index:10}
+.sig-drag:hover{opacity:1;box-shadow:0 0 12px #00d4ff66}
+
+.censor-block{position:absolute;background:rgba(0,0,0,0.6);border:2px solid #ef4444;z-index:8;cursor:pointer;min-width:20px;min-height:14px;display:flex;align-items:center;justify-content:center}
+.censor-block:hover{background:rgba(0,0,0,0.85);border-color:#fff}
+.censor-block .close-btn{position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;line-height:18px;text-align:center;cursor:pointer;display:none}
+.censor-block:hover .close-btn{display:block}
+
+.page-controls{display:flex;align-items:center;gap:8px;margin:6px 0}
+.page-controls span{font-size:12px;color:#94a3b8}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+
+.small-note{font-size:11px;color:#64748b;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>📄 PDF Editor</h1>
+<a href="https://hub.aelflab.com">← Dashboard</a>
+</div>
+
+<!-- Upload -->
+<div class="card">
+<h3>📤 Upload</h3>
+<div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+<div class="icon">📄</div>
+<div>Drag & drop PDF di sini, atau klik</div>
+<div class="sub">Max 50MB</div>
+</div>
+<input type="file" id="fileInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)">
+<div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="file-pills" id="fileList"></div>
+</div>
+
+<!-- Quick Tools -->
+<div class="row">
+<div class="card"><h3>🔀 Merge</h3><p class="small-note">Gabung beberapa PDF</p>
+<button class="btn btn-primary btn-sm" id="mergeBtn" onclick="mergePDFs()" disabled>🔀 Merge</button><div id="mergeResult"></div></div>
+
+<div class="card"><h3>✂️ Split</h3><p class="small-note">Ambil halaman tertentu</p>
+<select id="splitFile"><option value="">— Pilih —</option></select>
+<input type="text" id="splitPages" placeholder="Halaman: 1,3,5-7">
+<button class="btn btn-primary btn-sm" onclick="splitPDF()">✂️ Split</button><div id="splitResult"></div></div>
+</div>
+
+<!-- Preview + Sign -->
+<div class="card">
+<h3>✍️ Signature — Drag & Place</h3>
+<div class="row">
+<div style="display:flex;flex-direction:column;gap:8px">
+<select id="signFile"><option value="">— Pilih PDF —</option></select>
+<div class="drop-zone" style="padding:12px" onclick="document.getElementById('sigInput').click()">🖊️ Upload Tanda Tangan (PNG/JPG)</div>
+<input type="file" id="sigInput" accept=".png,.jpg,.jpeg" style="display:none" onchange="uploadSignature(this.files)">
+<div id="sigStatus" class="small-note">Belum ada signature</div>
+<div class="page-controls">
+<button class="btn btn-outline btn-sm" onclick="navSignPage(-1)">◀</button>
+<span id="signPageLabel">Hal 1</span>
+<button class="btn btn-outline btn-sm" onclick="navSignPage(1)">▶</button>
+</div>
+<button class="btn btn-primary btn-sm" onclick="applySign()">✍️ Apply Signature</button>
+<button class="btn btn-outline btn-sm" onclick="resetSignPos()">↺ Reset Posisi</button>
+<div id="signResult"></div>
+</div>
+<div class="preview-container" id="signPreviewWrap" style="max-width:100%;overflow:auto">
+<canvas id="signCanvas"></canvas>
+<img id="sigOverlay" class="sig-drag" style="display:none">
+</div>
+</div>
+</div>
+
+<!-- Preview + Censor -->
+<div class="card">
+<h3>🕵️ Censor — Drag untuk block, klik untuk hapus</h3>
+<div class="row">
+<div style="display:flex;flex-direction:column;gap:8px">
+<select id="censorFile"><option value="">— Pilih PDF —</option></select>
+<input type="text" id="censorText" placeholder="Atau sensor kata: KTP, 123456">
+<div class="toolbar">
+<button class="btn btn-outline btn-sm" id="censorDrawBtn" onclick="toggleCensorDraw()">✏️ Draw Mode</button>
+<button class="btn btn-warning btn-sm" onclick="clearCensorBlocks()">🗑 Clear Blocks</button>
+</div>
+<div class="page-controls">
+<button class="btn btn-outline btn-sm" onclick="navCensorPage(-1)">◀</button>
+<span id="censorPageLabel">Hal 1</span>
+<button class="btn btn-outline btn-sm" onclick="navCensorPage(1)">▶</button>
+</div>
+<button class="btn btn-danger btn-sm" onclick="applyCensor()">🕵️ Apply Censor</button>
+<div id="censorResult"></div>
+</div>
+<div class="preview-container" id="censorPreviewWrap" style="max-width:100%;overflow:auto;cursor:crosshair">
+<canvas id="censorCanvas"></canvas>
+<div id="censorOverlay" class="overlay active" style="width:100%;height:100%"></div>
+</div>
+</div>
+</div>
+
+<!-- Watermark + Info -->
+<div class="row">
+<div class="card"><h3>💧 Watermark</h3>
+<select id="wmFile"><option value="">— Pilih —</option></select>
+<input type="text" id="wmText" placeholder="Teks watermark">
+<div class="form-row"><input type="number" id="wmOpacity" placeholder="Opacity" value="0.3" min="0.05" max="1" step="0.05"><input type="number" id="wmAngle" placeholder="Angle" value="45" min="0" max="360"></div>
+<button class="btn btn-primary btn-sm" onclick="applyWatermark()">💧 Watermark</button><div id="wmResult"></div></div>
+
+<div class="card"><h3>📂 Files</h3><div id="fileTable"><div style="color:#475569;text-align:center;padding:12px;font-size:12px">Memuat...</div></div></div>
+</div>
+
+<!-- Additional tools row -->
+<div class="row">
+<div class="card"><h3>📝 Extract Text</h3>
+<select id="extractFile"><option value="">— Pilih —</option></select>
+<button class="btn btn-primary btn-sm" onclick="extractText()">📝 Extract</button><div id="extractResult"></div></div>
+
+<div class="card"><h3>ℹ️ Info & Stempel</h3>
+<select id="infoFile"><option value="">— Pilih —</option></select>
+<button class="btn btn-outline btn-sm" onclick="getInfo()">ℹ️ Info</button>
+<button class="btn btn-warning btn-sm" onclick="detectStamp()">🔍 Cari Stempel</button><div id="infoResult"></div></div>
+</div>
+</div>
+
+<script>
+const API='/api/pdf';
+let uploadedFiles=[];
+let sigImg=null, sigX=100, sigY=100, sigScale=1;
+let signCurrentPage=0, censorCurrentPage=0;
+let censorBlocks=[], censorDrawMode=true, censorDrawing=false, censorStart={x:0,y:0};
+let signFileCache=null, censorFileCache=null;
+
+// ── Init ──
+async function init(){
+  await loadFileList();
+  setupDragDrop();
+}
+function setupDragDrop(){
+  const dz=document.getElementById('dropZone');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');handleFiles(e.dataTransfer.files)});
+}
+
+// ── Upload ──
+async function handleFiles(files){
+  const w=document.getElementById('progressWrap'),b=document.getElementById('progressBar');
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    if(!f.name.toLowerCase().endsWith('.pdf'))continue;
+    w.style.display='block';b.style.width=Math.round(i/files.length*100)+'%';
+    const fd=new FormData();fd.append('file',f);
+    try{
+      const r=await fetch(API+'/upload',{method:'POST',body:fd});
+      const d=await r.json();
+      if(d.status==='ok')uploadedFiles.push(d);
+    }catch(e){}
+  }
+  w.style.display='none';b.style.width='0';
+  renderPills();await loadFileList();
+}
+
+function renderPills(){
+  const el=document.getElementById('fileList');
+  if(!uploadedFiles.length){el.innerHTML='';return}
+  el.innerHTML=uploadedFiles.map(f=>`<div class="file-pill">${f.filename} <span class="del" onclick="removeFile('${f.save_name}')">×</span></div>`).join('');
+  document.getElementById('mergeBtn').disabled=uploadedFiles.length<2;
+}
+function removeFile(n){uploadedFiles=uploadedFiles.filter(f=>f.save_name!==n);renderPills()}
+
+async function deleteFile(filename){
+  if(!confirm('Hapus '+filename+'?'))return;
+  try{
+    const r=await fetch(API+'/file/'+filename,{method:'DELETE'});
+    const d=await r.json();
+    if(d.status==='ok')loadFileList();else alert(d.message);
+  }catch(e){alert('Error: '+e)}
+}
+
+// ── Merge / Split ──
+async function mergePDFs(){
+  if(uploadedFiles.length<2)return;
+  const fd=new FormData();fd.append('files',JSON.stringify(uploadedFiles.map(f=>f.save_name)));fd.append('output_name','merged.pdf');
+  const el=document.getElementById('mergeResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/merge',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=d.status==='ok'?`<div class="success">✅ ${d.pages} hal</div><a href="${API}/download/${d.filename}" class="btn btn-primary btn-sm">⬇ Download</a>`:`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+async function splitPDF(){
+  const f=document.getElementById('splitFile').value,pages=document.getElementById('splitPages').value;
+  if(!f)return alert('Pilih file');
+  const fd=new FormData();fd.append('filename',f);fd.append('pages',pages);
+  const el=document.getElementById('splitResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/split',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=d.status==='ok'?`<div class="success">✅ ${d.pages} hal</div><a href="${API}/download/${d.filename}" class="btn btn-primary btn-sm">⬇ Download</a>`:`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+
+// ── Extract / Info / Stamp ──
+async function extractText(){
+  const f=document.getElementById('extractFile').value;if(!f)return;
+  const fd=new FormData();fd.append('filename',f);
+  const el=document.getElementById('extractResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/extract-text',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=d.status==='ok'?`<div class="success">✅ ${d.pages} hal · ${d.chars} karakter</div><div class="result-box">${(d.text||'').slice(0,2000)}</div>`:`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+async function getInfo(){
+  const f=document.getElementById('infoFile').value;if(!f)return;
+  const fd=new FormData();fd.append('filename',f);
+  const el=document.getElementById('infoResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/info',{method:'POST',body:fd});const d=await r.json();
+    if(d.status==='ok'){
+      const i=d.info;el.innerHTML=`<div class="result-box">📄 ${i.filename}\nHalaman: ${i.pages}\nSize: ${(i.size/1024).toFixed(1)}KB</div>`;
+    }else el.innerHTML=`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+async function detectStamp(){
+  const f=document.getElementById('infoFile').value;if(!f)return;
+  const fd=new FormData();fd.append('filename',f);
+  const el=document.getElementById('infoResult');el.innerHTML='🔍...';
+  try{
+    const r=await fetch(API+'/stamp-detect',{method:'POST',body:fd});const d=await r.json();
+    if(d.status==='ok')el.innerHTML=d.hits?`<div class="success">🔍 ${d.hits} stempel di ${d.total_pages} hal</div><div class="result-box">${d.results.map(r=>`Hal ${r.page}: ${(r.keywords||[]).join(',')||r.image} [${r.confidence}]`).join('\n')}</div>`:`<div class="warning">⚠️ Tidak ditemukan</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+
+// ── Signature Upload ──
+async function uploadSignature(files){
+  if(!files.length)return;const f=files[0];
+  if(!f.name.match(/\.(png|jpg|jpeg)$/i))return alert('Hanya PNG/JPG');
+  const reader=new FileReader();
+  reader.onload=e=>{sigImg=new Image();sigImg.onload=()=>renderSignPreview();sigImg.src=e.target.result};
+  reader.readAsDataURL(f);
+  const fd=new FormData();fd.append('file',f);
+  try{const r=await fetch(API+'/upload-signature',{method:'POST',body:fd});const d=await r.json();
+    if(d.status==='ok')document.getElementById('sigStatus').innerHTML='✅ '+d.original;
+  }catch(e){}
+}
+
+// ── Signature Preview + Drag ──
+async function loadSignPreview(){
+  const f=document.getElementById('signFile').value;
+  if(!f||f===signFileCache)return;
+  signFileCache=f;signCurrentPage=0;drawPdfPreview('signCanvas',f,signCurrentPage,'signPreview');
+}
+async function renderSignPreview(){
+  drawPdfPreview('signCanvas',signFileCache,signCurrentPage,'signPreview');
+}
+async function navSignPage(dir){
+  signCurrentPage=Math.max(0,signCurrentPage+dir);
+  drawPdfPreview('signCanvas',signFileCache,signCurrentPage,'signPreview');
+}
+function resetSignPos(){sigX=100;sigY=100;renderSignOverlay();renderSignPreview()}
+
+function renderSignOverlay(){
+  const canvas=document.getElementById('signCanvas');
+  const overlay=document.getElementById('sigOverlay');
+  if(!sigImg||!canvas.width){overlay.style.display='none';return}
+  overlay.style.display='block';
+  overlay.src=sigImg.src;
+  const w=sigImg.naturalWidth*sigScale*(150/sigImg.naturalWidth);
+  const h=sigImg.naturalHeight*sigScale*(60/sigImg.naturalHeight);
+  overlay.style.width=Math.round(w)+'px';
+  overlay.style.height=Math.round(h)+'px';
+  overlay.style.left=sigX+'px';
+  overlay.style.top=sigY+'px';
+  document.getElementById('signPageLabel').textContent='Hal '+(signCurrentPage+1);
+}
+
+function drawPdfPreview(canvasId,filename,page,callback){
+  const c=document.getElementById(canvasId);
+  const img=new Image();
+  img.onload=()=>{
+    c.width=img.width;c.height=img.height;
+    c.getContext('2d').drawImage(img,0,0);
+    if(callback==='signPreview')renderSignOverlay();
+    if(callback==='censorPreview')renderCensorBlocks();
+  };
+  img.src=API+'/preview/'+filename+'?page='+page+'&t='+Date.now();
+  if(callback==='signPreview')document.getElementById('signPageLabel').textContent='Hal '+(page+1);
+  if(callback==='censorPreview')document.getElementById('censorPageLabel').textContent='Hal '+(page+1);
+}
+
+// ── Sig Overlay Drag ──
+(function(){
+  const el=document.getElementById('sigOverlay');
+  let dragging=false,dx=0,dy=0;
+  el.addEventListener('mousedown',e=>{dragging=true;dx=e.clientX-el.offsetLeft;dy=e.clientY-el.offsetTop;el.style.cursor='grabbing';e.preventDefault()});
+  document.addEventListener('mousemove',e=>{if(!dragging)return;sigX=e.clientX-dx;sigY=e.clientY-dy;renderSignOverlay()});
+  document.addEventListener('mouseup',()=>{dragging=false;el.style.cursor='move'});
+  // Touch support
+  el.addEventListener('touchstart',e=>{dragging=true;dx=e.touches[0].clientX-el.offsetLeft;dy=e.touches[0].clientY-el.offsetTop;e.preventDefault()});
+  document.addEventListener('touchmove',e=>{if(!dragging)return;sigX=e.touches[0].clientX-dx;sigY=e.touches[0].clientY-dy;renderSignOverlay()});
+  document.addEventListener('touchend',()=>{dragging=false});
+})();
+
+async function applySign(){
+  const f=document.getElementById('signFile').value;if(!f)return alert('Pilih PDF');
+  const fd=new FormData();fd.append('filename',f);fd.append('page',signCurrentPage);
+  fd.append('x',Math.round(sigX));fd.append('y',Math.round(sigY));
+  fd.append('sig_scale',sigScale);fd.append('sig_opacity','0.9');
+  const el=document.getElementById('signResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/sign',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=d.status==='ok'?`<div class="success">✅ Signed!</div><a href="${API}/download/${d.filename}" class="btn btn-primary btn-sm">⬇ Download</a>`:`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+
+document.getElementById('signFile').addEventListener('change',()=>{loadSignPreview()});
+
+// ── Censor Preview ──
+async function loadCensorPreview(){
+  const f=document.getElementById('censorFile').value;
+  if(!f||f===censorFileCache)return;
+  censorFileCache=f;censorCurrentPage=0;censorBlocks=[];
+  drawPdfPreview('censorCanvas',f,censorCurrentPage,'censorPreview');
+}
+async function navCensorPage(dir){
+  censorCurrentPage=Math.max(0,censorCurrentPage+dir);
+  drawPdfPreview('censorCanvas',censorFileCache,censorCurrentPage,'censorPreview');
+}
+
+function toggleCensorDraw(){
+  censorDrawMode=!censorDrawMode;
+  document.getElementById('censorDrawBtn').textContent=censorDrawMode?'✏️ Draw Mode':'👆 Move Mode';
+  document.getElementById('censorPreviewWrap').style.cursor=censorDrawMode?'crosshair':'default';
+}
+
+function renderCensorBlocks(){
+  const overlay=document.getElementById('censorOverlay');
+  const canvas=document.getElementById('censorCanvas');
+  if(!canvas.width){overlay.innerHTML='';return}
+  overlay.innerHTML=censorBlocks.filter(b=>b.page===censorCurrentPage).map((b,i)=>{
+    const globalIdx=censorBlocks.indexOf(b);
+    return `<div class="censor-block" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px" data-idx="${globalIdx}">
+      <span class="close-btn" onclick="removeCensorBlock(${globalIdx})">×</span>
+    </div>`;
+  }).join('');
+  // Make censor blocks draggable (always movable)
+  overlay.querySelectorAll('.censor-block').forEach(el=>{
+    let drag=false,sx=0,sy=0,ox=0,oy=0;
+    el.addEventListener('mousedown',e=>{
+      if(censorDrawMode)return;
+      drag=true;const idx=parseInt(el.dataset.idx);
+      sx=e.clientX;sy=e.clientY;ox=censorBlocks[idx].x;oy=censorBlocks[idx].y;
+      e.stopPropagation();
+    });
+    document.addEventListener('mousemove',e=>{
+      if(!drag)return;const idx=parseInt(el.dataset.idx);const dx=e.clientX-sx,dy=e.clientY-sy;
+      censorBlocks[idx].x=ox+dx;censorBlocks[idx].y=oy+dy;
+      el.style.left=(ox+dx)+'px';el.style.top=(oy+dy)+'px';
+    });
+    document.addEventListener('mouseup',()=>{drag=false});
+    // Touch
+    el.addEventListener('touchstart',e=>{
+      if(censorDrawMode)return;
+      drag=true;const idx=parseInt(el.dataset.idx);
+      sx=e.touches[0].clientX;sy=e.touches[0].clientY;ox=censorBlocks[idx].x;oy=censorBlocks[idx].y;
+      e.stopPropagation();
+    });
+    document.addEventListener('touchmove',e=>{
+      if(!drag)return;const idx=parseInt(el.dataset.idx);const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
+      censorBlocks[idx].x=ox+dx;censorBlocks[idx].y=oy+dy;el.style.left=(ox+dx)+'px';el.style.top=(oy+dy)+'px';
+    });
+    document.addEventListener('touchend',()=>{drag=false});
+  });
+  document.getElementById('censorPageLabel').textContent='Hal '+(censorCurrentPage+1);
+}
+
+function removeCensorBlock(idx){censorBlocks.splice(idx,1);renderCensorBlocks()}
+function clearCensorBlocks(){censorBlocks=[];renderCensorBlocks()}
+
+// Censor drawing on canvas area
+(function(){
+  const wrap=document.getElementById('censorPreviewWrap');
+  wrap.addEventListener('mousedown',e=>{
+    if(!censorDrawMode)return;
+    const rect=wrap.getBoundingClientRect();
+    censorDrawing=true;
+    censorStart={x:e.clientX-rect.left+wrap.scrollLeft,y:e.clientY-rect.top+wrap.scrollTop};
+    e.preventDefault();
+  });
+  wrap.addEventListener('mousemove',e=>{
+    if(!censorDrawing||!censorDrawMode)return;
+    // Visual feedback: show ghost rect via overlay child
+    const rect=wrap.getBoundingClientRect();
+    const cx=e.clientX-rect.left+wrap.scrollLeft,cy=e.clientY-rect.top+wrap.scrollTop;
+    const x=Math.min(censorStart.x,cx),y=Math.min(censorStart.y,cy);
+    const w=Math.abs(cx-censorStart.x),h=Math.abs(cy-censorStart.y);
+    if(w>5&&h>5){
+      renderCensorBlocks(); // clear overlay first
+      const overlay=document.getElementById('censorOverlay');
+      const ghost=document.createElement('div');ghost.className='censor-block';
+      ghost.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px;opacity:0.5;pointer-events:none`;
+      overlay.appendChild(ghost);
+    }
+  });
+  wrap.addEventListener('mouseup',e=>{
+    if(!censorDrawing||!censorDrawMode){censorDrawing=false;return}
+    censorDrawing=false;
+    const rect=wrap.getBoundingClientRect();
+    const cx=e.clientX-rect.left+wrap.scrollLeft,cy=e.clientY-rect.top+wrap.scrollTop;
+    const x=Math.min(censorStart.x,cx),y=Math.min(censorStart.y,cy);
+    const w=Math.abs(cx-censorStart.x),h=Math.abs(cy-censorStart.y);
+    if(w>10&&h>8){
+      censorBlocks.push({page:censorCurrentPage,x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)});
+    }
+    renderCensorBlocks();
+  });
+})();
+
+async function applyCensor(){
+  const f=document.getElementById('censorFile').value;if(!f)return alert('Pilih PDF');
+  const text=document.getElementById('censorText').value.trim();
+  if(!text&&!censorBlocks.length)return alert('Masukkan teks atau buat block sensor');
+  const fd=new FormData();fd.append('filename',f);
+  if(text)fd.append('text',text);
+  if(censorBlocks.length)fd.append('blocks',JSON.stringify(censorBlocks));
+  const el=document.getElementById('censorResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/censor',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=(d.status==='ok'&&d.found>0)?`<div class="success">✅ ${d.found} dicensor!</div><a href="${API}/download/${d.filename}" class="btn btn-danger btn-sm">⬇ Download</a>`:`<div class="warning">⚠️ ${d.message||'Tidak ada'}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+
+document.getElementById('censorFile').addEventListener('change',()=>{loadCensorPreview()});
+
+// ── Watermark ──
+async function applyWatermark(){
+  const f=document.getElementById('wmFile').value,t=document.getElementById('wmText').value.trim();
+  if(!f||!t)return alert('Pilih file & isi teks');
+  const fd=new FormData();fd.append('filename',f);fd.append('watermark_text',t);
+  fd.append('opacity',document.getElementById('wmOpacity').value||'0.3');
+  fd.append('angle',document.getElementById('wmAngle').value||'45');
+  const el=document.getElementById('wmResult');el.innerHTML='⏳...';
+  try{
+    const r=await fetch(API+'/watermark',{method:'POST',body:fd});const d=await r.json();
+    el.innerHTML=d.status==='ok'?`<div class="success">✅</div><a href="${API}/download/${d.filename}" class="btn btn-primary btn-sm">⬇ Download</a>`:`<div class="error">❌ ${d.message}</div>`;
+  }catch(e){el.innerHTML=`<div class="error">❌ ${e}</div>`}
+}
+
+// ── File List ──
+async function loadFileList(){
+  try{
+    const r=await fetch(API+'/list');const d=await r.json();
+    const selects=['splitFile','extractFile','infoFile','signFile','censorFile','wmFile'];
+    const el=document.getElementById('fileTable');
+    if(!d.files||!d.files.length){
+      el.innerHTML='<div style="color:#475569;text-align:center;padding:12px;font-size:12px">Belum ada file</div>';
+      selects.forEach(id=>{const s=document.getElementById(id);if(s)s.innerHTML='<option value="">— Tidak ada —</option>'});
+      return;
+    }
+    const opts=d.files.map(f=>`<option value="${f.name}">${f.name}</option>`).join('');
+    selects.forEach(id=>{const s=document.getElementById(id);if(s)s.innerHTML='<option value="">— Pilih —</option>'+opts});
+    el.innerHTML=d.files.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #151a28"><span>📄 ${f.name}</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#64748b;font-size:11px">${(f.size/1024).toFixed(0)}KB</span><button class="btn btn-outline btn-sm" style="padding:2px 8px;color:#ef4444;border-color:#ef4444" onclick="deleteFile('${f.name}')">🗑</button></div></div>`).join('');
+  }catch(e){document.getElementById('fileTable').innerHTML='<div class="error">Gagal</div>'}
+}
+
+init();
+</script>
+</body>
+</html>
