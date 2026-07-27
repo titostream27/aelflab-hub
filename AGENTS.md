@@ -16,6 +16,7 @@
 - Open WebUI dan Cloudflare Tunnel sudah ada. Jangan mengubahnya tanpa permintaan eksplisit.
 - DeepSeek menggunakan inferensi cloud; Hermes, gateway, dan tool berjalan pada homelab.
 - Jangan pernah menampilkan API key, token Telegram, isi .env, atau kredensial.
+- Konfigurasi Hub dibaca dari environment variable, fallback ke $HERMES_HOME\.env: DEEPSEEK_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, HERMES_HOME, FINANCE_DB. Template ada di .env.example. Jangan hardcode nilai apa pun dari daftar ini ke dalam source.
 - Verifikasi status service menggunakan perintah read-only sebelum melaporkannya.
 - Simpan file kerja agent secara default di D:\homelab\hermes-workspace.
 
@@ -29,10 +30,15 @@
 - Saat membantu konfigurasi homelab, lakukan satu langkah aman per giliran dan tunggu hasil pengguna sebelum melanjutkan.
 - AelfLab Hub tersedia di https://hub.aelflab.com.
 - Backend FastAPI: D:\homelab\hermes-workspace\hub\backend\main.py pada port 8081.
-- Redirect aelflab.com ke hub.aelflab.com berjalan pada port 8082.
+- Satu proses FastAPI melayani tiga aplikasi sekaligus, dibedakan dari header Host: hub (monitoring), finance.aelflab.com (finance tracker), pdf.aelflab.com (PDF editor). Path /finance dan /pdf tersedia sebagai alternatif.
+- Redirect aelflab.com ke hub.aelflab.com berjalan pada port 8082 melalui redirect.py.
 - Autostart Hub dan Redirect menggunakan Windows Scheduled Tasks AelfLab_Hub dan AelfLab_Redirect.
+- Hub tidak dikontainerisasi. Seluruh monitoring memanggil powershell.exe sehingga hanya bisa berjalan native di Windows.
+- Dependensi backend dipasang dari requirements.txt.
 - Cloudflare Tunnel aelflab: ai.aelflab.com ke port 3000, hub.aelflab.com ke port 8081, dan aelflab.com ke port 8082.
 - Cloudflare Access aktif.
+- Belum terverifikasi: hostname finance.aelflab.com dan pdf.aelflab.com dipakai oleh aplikasi tetapi tidak tercatat dalam daftar route tunnel maupun policy Access di atas. Periksa "cloudflared tunnel route dns" dan policy Access untuk kedua hostname sebelum menganggapnya terlindungi.
+- Tidak ada autentikasi di level aplikasi. Seluruh /api/* mengandalkan Cloudflare Access. Jangan ekspos port 8081 langsung ke internet.
 - Konfigurasi Cloudflare user: C:\Users\Home\.cloudflared\config.yml.
 - Konfigurasi service: C:\Windows\System32\config\systemprofile\.cloudflared\config.yml.
 - Setelah mengubah konfigurasi user, salin ke konfigurasi service lalu restart service cloudflared.

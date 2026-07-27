@@ -74,16 +74,35 @@ def log_snapshot(data: dict):
 
 # ── Get DeepSeek API Key ─────────────────────────
 
+def hermes_home() -> Path:
+    return Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes"))
+
+
+def get_secret(name: str) -> str:
+    """Baca konfigurasi dari environment, fallback ke .env milik Hermes.
+
+    Dipakai untuk kredensial dan identitas yang tidak boleh ada di source.
+    """
+    val = os.environ.get(name, "")
+    if val:
+        return val
+    env_path = hermes_home() / ".env"
+    if env_path.exists():
+        try:
+            for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if line.startswith("#") or "=" not in line:
+                    continue
+                key, _, raw = line.partition("=")
+                if key.strip() == name:
+                    return raw.strip().strip('"').strip("'")
+        except Exception as e:
+            print(f"[warn] gagal baca {env_path}: {e}")
+    return ""
+
+
 def get_dk_key() -> str:
-    key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if not key:
-        env_path = Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / ".env"
-        if env_path.exists():
-            for line in env_path.read_text().splitlines():
-                if line.startswith("DEEPSEEK_API_KEY="):
-                    key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
-    return key
+    return get_secret("DEEPSEEK_API_KEY")
 
 
 def run_pwsh_file(script_name: str) -> str:
@@ -309,7 +328,7 @@ async def serve_pdf():
 
 # ── Cron Manager ────────────────────────────────
 
-CRON_DIR = Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / "cron"
+CRON_DIR = hermes_home() / "cron"
 
 @app.get("/api/cron")
 async def cron_list():
@@ -355,7 +374,7 @@ async def cron_list():
 
 def get_job_name(job_id: str) -> str:
     """Baca nama job dari jobs.json."""
-    jobs_file = Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / "cron" / "jobs.json"
+    jobs_file = hermes_home() / "cron" / "jobs.json"
     if not jobs_file.exists():
         return job_id
     try:
@@ -373,18 +392,17 @@ def get_job_name(job_id: str) -> str:
     return job_id
 
 def send_telegram_msg(text: str):
-    """Kirim notifikasi ke Telegram pribadi user."""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    if not token:
-        env_path = Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / ".env"
-        if env_path.exists():
-            for line in env_path.read_text().splitlines():
-                if line.startswith("TELEGRAM_BOT_TOKEN="):
-                    token = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
-    if not token:
+    """Kirim notifikasi ke Telegram.
+
+    Token dan chat id dibaca dari environment atau .env Hermes — keduanya
+    tidak boleh di-hardcode di source.
+    """
+    token = get_secret("TELEGRAM_BOT_TOKEN")
+    chat_id = get_secret("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        print("[warn] notifikasi Telegram dilewati: "
+              "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diset")
         return
-    chat_id = "8510249854"  # DM Tito
     try:
         import httpx
         with httpx.Client(timeout=5) as client:
@@ -397,11 +415,11 @@ def send_telegram_msg(text: str):
 @app.post("/api/cron/run/{job_id}")
 async def cron_run(job_id: str):
     try:
-        venv_python = Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+        venv_python = hermes_home() / "hermes-agent" / "venv" / "Scripts" / "python.exe"
         r = subprocess.run(
             [str(venv_python), "-m", "hermes_cli.main", "cron", "run", job_id],
             capture_output=True, text=True, timeout=180,
-            cwd=Path(os.environ.get("HERMES_HOME", "D:/homelab/hermes")) / "hermes-agent"
+            cwd=hermes_home() / "hermes-agent"
         )
         success = r.returncode == 0
         job_name = get_job_name(job_id)
