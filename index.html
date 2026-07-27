@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AelfLab Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 50: '#f0f0f0', 100: '#e0e0e0', 200: '#c0c0c0', 300: '#a0a0a0', 400: '#808080', 500: '#606060', 600: '#404040', 700: '#2a2a2a', 800: '#1a1a1a', 900: '#0f0f0f', 950: '#070707' },
+                        accent: { DEFAULT: '#00d4ff', dark: '#0099cc', light: '#66e5ff' },
+                        purple: { DEFAULT: '#7b2ff7', light: '#a855f7' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #070707; }
+        .card-hover { transition: all 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 212, 255, 0.15); }
+        .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .nav-blur { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f0f0f; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-dark-950/80 nav-blur border-b border-dark-700/50">
+        <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple flex items-center justify-center text-black font-bold text-sm">A</div>
+                <span class="font-semibold text-lg tracking-tight">AelfLab</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <span class="flex items-center gap-1.5 text-gray-400">
+                    <span class="pulse-dot bg-green-500"></span>
+                    <span id="statusText">Connected</span>
+                </span>
+                <span class="text-dark-400">|</span>
+                <span id="clock" class="font-mono text-xs text-gray-500"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 pt-20 pb-10">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p class="text-gray-500 text-sm mt-1">hub.aelflab.com</p>
+        </div>
+
+        <!-- ROW 1: Apps + Monitoring -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+            <!-- Apps -->
+            <div class="xl:col-span-2 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Apps</h2>
+                    <span class="text-xs text-gray-600" id="appCount">0 service</span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="appGrid"></div>
+            </div>
+            <!-- Monitoring -->
+            <div class="space-y-4">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Monitoring</h2>
+                <div class="space-y-3" id="monitorGrid"></div>
+            </div>
+        </div>
+
+
+        <!-- ROW 2: Ollama Models + Network -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+            <!-- Ollama Models -->
+            <div class="xl:col-span-2 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Ollama Models</h2>
+                    <span class="text-xs text-gray-600" id="modelCount">—</span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-dark-700 bg-dark-800/50">
+                    <table class="w-full text-sm" id="modelTable">
+                        <thead><tr class="text-left text-gray-500 text-xs uppercase border-b border-dark-700">
+                            <th class="px-4 py-3 font-medium">Name</th>
+                            <th class="px-4 py-3 font-medium">ID</th>
+                            <th class="px-4 py-3 font-medium">Size</th>
+                            <th class="px-4 py-3 font-medium">Modified</th>
+                        </tr></thead>
+                        <tbody id="modelBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Network Traffic -->
+            <div class="space-y-4">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Network</h2>
+                <div class="p-4 rounded-xl border border-dark-700 bg-dark-800/50 space-y-3" id="networkWidget">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🌐</span>
+                        <div>
+                            <div class="text-xs text-gray-500">Interface</div>
+                            <div class="text-sm font-medium" id="netName">—</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 rounded-lg bg-dark-900/50">
+                            <div class="text-xs text-gray-500">⬇️ Received</div>
+                            <div class="text-sm font-medium text-accent" id="netRx">—</div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-dark-900/50">
+                            <div class="text-xs text-gray-500">⬆️ Sent</div>
+                            <div class="text-sm font-medium text-purple-light" id="netTx">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 3: Charts -->
+        <div class="space-y-4">
+            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">History</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="p-4 rounded-xl border border-dark-700 bg-dark-800/50">
+                    <div class="text-xs text-gray-500 mb-2">⏱️ Uptime (hours)</div>
+                    <div style="position:relative; height:180px"><canvas id="chartUptime"></canvas></div>
+                </div>
+                <div class="p-4 rounded-xl border border-dark-700 bg-dark-800/50">
+                    <div class="text-xs text-gray-500 mb-2">💾 Disk Free (GB)</div>
+                    <div style="position:relative; height:180px"><canvas id="chartDisk"></canvas></div>
+                </div>
+                <div class="p-4 rounded-xl border border-dark-700 bg-dark-800/50">
+                    <div class="text-xs text-gray-500 mb-2">🧠 Memory (%)</div>
+                    <div style="position:relative; height:180px"><canvas id="chartMemory"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 4: Cron Manager -->
+        <div class="space-y-4 mt-8">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">⏰ Cron Jobs</h2>
+                <span class="text-xs text-gray-600" id="cronCount">—</span>
+            </div>
+            <div class="rounded-xl border border-dark-700 bg-dark-800/50 overflow-hidden" id="cronSection">
+                <div id="cronList" class="p-4 text-sm text-gray-500">Loading...</div>
+            </div>
+        </div>
+
+        <!-- ROW 5: Speed Test -->
+        <div class="flex items-start gap-6 mt-8 flex-wrap">
+            <div class="space-y-4">
+                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">🚀 Speed Test</h2>
+                <div class="p-4 rounded-xl border border-dark-700 bg-dark-800/50 flex items-center gap-6">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 mb-1">Ping</div>
+                        <div class="text-xl font-bold text-accent" id="stPing">—</div>
+                        <div class="text-[10px] text-gray-600">ms</div>
+                    </div>
+                    <div class="w-px h-10 bg-dark-600"></div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 mb-1">Download</div>
+                        <div class="text-xl font-bold text-purple-light" id="stDl">—</div>
+                        <div class="text-[10px] text-gray-600">/s</div>
+                    </div>
+                    <button onclick="runSpeedTest()" class="ml-2 px-4 py-2 text-xs font-medium rounded-lg bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-all">Test</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: Ollama Models + Network -->
+
+    </div>
+
+    <script>
+        // ── APPS ──
+        const apps = [
+            { name: 'Hub', url: 'https://hub.aelflab.com', icon: '⚡', desc: 'Control Panel', status: 'online', current: true },
+            { name: 'Finance', url: 'https://finance.aelflab.com', icon: '💰', desc: 'Catatan Keuangan', status: 'online' },
+            { name: 'PDF', url: 'https://pdf.aelflab.com', icon: '📄', desc: 'PDF Editor', status: 'online' },
+            { name: 'Open WebUI', url: 'https://ai.aelflab.com', icon: '🤖', desc: 'AI Chat Interface', status: 'online' },
+            { name: 'Ollama', url: 'http://localhost:11434', icon: '🦙', desc: 'LLM Engine', status: 'online' },
+            { name: 'Coming Soon', url: '#', icon: '➕', desc: 'Add service', status: 'soon' },
+        ];
+
+        let monitorData = {};
+        let charts = {};
+
+        // ── RENDER APPS ──
+        function renderApps() {
+            const grid = document.getElementById('appGrid');
+            grid.innerHTML = '';
+            apps.forEach(app => {
+                const soon = app.status === 'soon';
+                const card = document.createElement('a');
+                card.href = soon ? '#' : app.url;
+                card.target = soon ? '_self' : '_blank';
+                card.className = `block p-4 rounded-xl border ${soon ? 'border-dashed border-dark-600 bg-dark-900/30 opacity-50 cursor-default' : 'border-dark-700 bg-dark-800/80 card-hover cursor-pointer hover:border-accent/30'}`;
+                card.innerHTML = `
+                    <div class="text-2xl mb-2">${app.icon}</div>
+                    <div class="font-semibold text-sm ${soon ? 'text-gray-500' : 'text-white'}">${app.name}</div>
+                    <div class="text-xs text-gray-500 mt-0.5">${app.desc}</div>
+                    ${app.current ? '<div class="mt-2 text-[10px] font-medium text-accent">● Active</div>' : ''}
+                    ${soon ? '<div class="mt-2 text-[10px] font-medium text-gray-600">Soon</div>' : ''}
+                `;
+                grid.appendChild(card);
+            });
+            document.getElementById('appCount').textContent = `${apps.filter(a => a.status !== 'soon').length} service`;
+        }
+
+        // ── RENDER MONITORING ──
+        function renderMonitor() {
+            const grid = document.getElementById('monitorGrid');
+            const items = [
+                { label: 'DeepSeek', value: monitorData.deepseek_balance, icon: '💰' },
+                { label: 'Disk D:', value: `${monitorData.disk_free} / ${monitorData.disk_total}`, icon: '💾' },
+                { label: 'Memory', value: `${monitorData.memory_used} / ${monitorData.memory_total}`, icon: '🧠' },
+                { label: 'Docker', value: monitorData.docker, icon: '🐳' },
+                { label: 'Ollama', value: monitorData.ollama, icon: '🦙' },
+                { label: 'Gateway', value: monitorData.gateway, icon: '🔌' },
+                { label: 'Uptime', value: monitorData.uptime, icon: '⏱️' },
+                { label: 'Tailscale', value: monitorData.ip_tailscale, icon: '🔗' },
+                { label: 'Local IP', value: monitorData.ip_local, icon: '🏠' },
+                { label: 'GPU', value: monitorData.gpu || '—', icon: '🔥' },
+            ];
+            grid.innerHTML = '';
+            items.forEach(w => {
+                const ok = w.value && w.value !== '—' && !String(w.value).includes('—');
+                const dot = ok ? 'bg-green-500' : 'bg-gray-600';
+                const div = document.createElement('div');
+                div.className = 'flex items-start gap-3 p-3 rounded-xl border border-dark-700 bg-dark-800/50';
+                div.innerHTML = `
+                    <span class="text-lg mt-0.5">${w.icon}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs text-gray-500">${w.label}</div>
+                        <div class="text-sm font-medium text-white truncate">${w.value || '—'}</div>
+                    </div>
+                    <span class="w-2 h-2 rounded-full ${dot} mt-2 flex-shrink-0"></span>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        // ── OLLAMA MODELS ──
+        async function fetchModels() {
+            try {
+                const res = await fetch('/api/ollama/models');
+                if (!res.ok) throw Error();
+                const data = await res.json();
+                const tbody = document.getElementById('modelBody');
+                document.getElementById('modelCount').textContent = `${data.models.length} model(s)`;
+                tbody.innerHTML = data.models.map(m => `
+                    <tr class="border-b border-dark-700/50 hover:bg-dark-700/30">
+                        <td class="px-4 py-3 font-medium text-white">${m.name}</td>
+                        <td class="px-4 py-3 text-gray-400 text-xs font-mono">${m.id}</td>
+                        <td class="px-4 py-3 text-gray-300">${m.size} ${m.modified.split(' ')[0]}</td>
+                        <td class="px-4 py-3 text-gray-500">${m.modified.split(' ').slice(1).join(' ')}</td>
+                    </tr>
+                `).join('');
+            } catch { /* offline */ }
+        }
+
+        // ── NETWORK ──
+        async function fetchNetwork() {
+            try {
+                const res = await fetch('/api/network');
+                if (!res.ok) throw Error();
+                const d = await res.json();
+                document.getElementById('netName').textContent = d.name || '—';
+                document.getElementById('netRx').textContent = d.rx_gb || '—';
+                document.getElementById('netTx').textContent = d.tx_gb || '—';
+            } catch { /* offline */ }
+        }
+
+        // ── HISTORY CHARTS ──
+        function createChart(id, label, data, color, borderColor) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.t),
+                    datasets: [{
+                        label, data: data.map(d => d.value),
+                        borderColor, backgroundColor: color,
+                        borderWidth: 2, pointRadius: 0, tension: 0.3,
+                        fill: { target: 'origin', above: color },
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 5 } },
+                        y: { display: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#666', font: { size: 10 }, maxTicksLimit: 4 } }
+                    }
+                }
+            });
+        }
+
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/api/history?days=7');
+                if (!res.ok) throw Error();
+                const h = await res.json();
+
+                if (charts.uptime) charts.uptime.destroy();
+                if (charts.disk) charts.disk.destroy();
+                if (charts.memory) charts.memory.destroy();
+
+                if (h.uptime.length > 0) {
+                    charts.uptime = createChart('chartUptime', 'Uptime (h)',
+                        h.uptime.map(d => ({ t: d.t, value: d.hours })),
+                        'rgba(0,212,255,0.1)', '#00d4ff');
+                }
+                if (h.disk.length > 0) {
+                    charts.disk = createChart('chartDisk', 'Free (GB)',
+                        h.disk.map(d => ({ t: d.t, value: d.free_gb })),
+                        'rgba(123,47,247,0.1)', '#7b2ff7');
+                }
+                if (h.memory.length > 0) {
+                    charts.memory = createChart('chartMemory', 'Mem %',
+                        h.memory.map(d => ({ t: d.t, value: d.pct })),
+                        'rgba(168,85,247,0.1)', '#a855f7');
+                }
+            } catch { /* no data yet */ }
+        }
+
+        // ── STATUS ──
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw Error();
+                monitorData = await res.json();
+            } catch {}
+            renderMonitor();
+        }
+
+        // ── CLOCK ──
+        function updateClock() {
+            const n = new Date();
+            document.getElementById('clock').textContent = n.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' });
+        }
+
+        // ── CRON MANAGER ──
+        async function fetchCron() {
+            try {
+                const res = await fetch('/api/cron');
+                if (!res.ok) throw Error();
+                const d = await res.json();
+                document.getElementById('cronCount').textContent = d.jobs.length + ' job(s)';
+                let html = '';
+                for (const j of d.jobs) {
+                    const status = j.enabled === false ? 'gray' : (j.last_status === 'error' ? 'red' : 'green');
+                    html += `<div class="flex items-center justify-between px-4 py-3 border-b border-dark-700/50 hover:bg-dark-700/30">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-white truncate">${j.name || j.id}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">${j.schedule || '—'} · Next: ${j.next_run_at || '—'}</div>
+                            ${j.last_run_at ? `<div class="text-xs text-gray-600 mt-0.5">Last: ${j.last_run_at} · ${j.last_status || '—'}</div>` : ''}
+                        </div>
+                        <button onclick="runCron('${j.id}')" class="ml-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-all">▶ Run</button>
+                    </div>`;
+                }
+                if (!html) html = '<div class="p-4 text-sm text-gray-500">No cron jobs</div>';
+                document.getElementById('cronList').innerHTML = html;
+            } catch { document.getElementById('cronList').innerHTML = '<div class="p-4 text-sm text-gray-500">Error loading</div>'; }
+        }
+
+        async function runCron(jobId) {
+            const btn = event.target;
+            btn.textContent = '⏳'; btn.disabled = true;
+            try {
+                const res = await fetch('/api/cron/run/' + jobId, { method: 'POST' });
+                const d = await res.json();
+                btn.textContent = d.status === 'ok' ? '✅' : '❌';
+                setTimeout(() => fetchCron(), 2000);
+            } catch { btn.textContent = '❌'; }
+            setTimeout(() => { btn.textContent = '▶ Run'; btn.disabled = false; }, 3000);
+        }
+
+        // ── SPEED TEST ──
+        async function runSpeedTest() {
+            document.getElementById('stPing').textContent = '...';
+            document.getElementById('stDl').textContent = '...';
+            try {
+                const res = await fetch('/api/speedtest');
+                if (!res.ok) throw Error();
+                const d = await res.json();
+                document.getElementById('stPing').textContent = d.ping_ms || '—';
+                document.getElementById('stDl').textContent = d.download_speed || '—';
+            } catch {
+                document.getElementById('stPing').textContent = 'ERR';
+                document.getElementById('stDl').textContent = 'ERR';
+            }
+        }
+
+        // ── GPU ──
+        async function fetchGPU() {
+            try {
+                const res = await fetch('/api/gpu');
+                if (!res.ok) throw Error();
+                const d = await res.json();
+                const parts = [d.name, d.vram_used + '/' + d.vram_total, d.util_pct, d.driver].filter(Boolean);
+                monitorData.gpu = parts.join(' · ');
+            } catch {}
+        }
+
+        // ── FULL REFRESH ──
+        async function fullRefresh() {
+            await Promise.all([fetchStatus(), fetchModels(), fetchNetwork(), fetchHistory(), fetchCron(), fetchGPU()]);
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+        renderApps();
+        fullRefresh();
+        setInterval(fullRefresh, 60000);
+        runSpeedTest();
+    </script>
+</body>
+</html>
