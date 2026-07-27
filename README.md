@@ -47,9 +47,17 @@ SQLite di `data/finance.db` dengan tabel `accounts`, `categories`, `transactions
 
 Kategori dan akun default di-seed saat `GET /api/finance/init`.
 
+Transaksi bisa diedit dan dihapus; efeknya ke saldo akun dibalik lewat satu fungsi (`_apply_balance`) sehingga saldo tidak pernah lepas sinkron. `POST /api/finance/recalc` menghitung ulang seluruh saldo dari daftar transaksi sebagai jaring pengaman.
+
+Transaksi rutin (gaji, sewa, nafkah) menyimpan tanggal jatuh tempo berikutnya. `POST /api/finance/recurring/run-due` mencatat semua yang sudah jatuh tempo, termasuk yang tertunggak beberapa bulan, dan idempoten — dipanggil dua kali tidak membuat duplikat.
+
+Budget `spent` selalu dihitung dari transaksi sebenarnya, bukan ditambah inkremental, jadi tetap benar walau budget dibuat setelah pengeluaran terjadi.
+
 ### 3. PDF Editor
 
 Merge, split, extract text, info/metadata, tanda tangan, censor, watermark, deteksi stempel, dan preview halaman.
+
+Tanda tangan bisa **ditulis langsung di browser** (canvas dengan pointer events, latar transparan, dipotong otomatis ke bounding box tinta) atau diunggah sebagai PNG/JPG.
 
 Semua geometri memakai satu kontrak: **PDF point** (72/inch), origin kiri-atas — sama seperti ruang koordinat PyMuPDF. Preview dirender pada `dpi = 72 * zoom`, jadi:
 
@@ -126,7 +134,6 @@ Menggabungkan akun duplikat (referensi transaksi diarahkan ulang lebih dulu supa
 ## Catatan & keterbatasan
 
 - **Windows-only.** Seluruh monitoring bergantung pada `powershell.exe`. Tidak ada containerisasi karena hal ini; deployment memakai Scheduled Task.
-- **Recurring dan installments belum otomatis.** Tabel dan endpoint POST sudah ada, tapi belum ada scheduler yang membuat transaksi pada tanggal jatuh tempo, dan `next_date` tidak pernah dihitung.
-- **Budget belum punya endpoint GET** maupun UI; `spent` hanya ter-update kalau baris budget-nya sudah ada lebih dulu.
-- **Transaksi belum bisa diedit atau dihapus** dari UI.
+- **Recurring belum berjalan sendiri.** Jatuh tempo sudah dihitung dan bisa dieksekusi lewat `POST /api/finance/recurring/run-due`, tapi masih perlu dipicu — dari UI, atau dijadwalkan sebagai cron job Hermes. Belum ada scheduler internal.
+- **Tipe `invest` tidak mengubah saldo akun**, sementara `saving` menambah saldo. Aturan ini dipertahankan agar konsisten dengan data historis; mengubahnya butuh migrasi data yang disengaja.
 - History hanya tercatat saat `/api/status` diakses, jadi grafik berlubang kalau dashboard lama tidak dibuka.
