@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime data — uploads, generated PDFs, signatures, finance DB, history
+data/
+*.db
+*.jsonl
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
