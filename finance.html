@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance — AelfLab Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0b0d15;color:#e2e8f0;min-height:100vh}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.header h1{font-size:24px;font-weight:700;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .links{display:flex;gap:12px}
+.header a{color:#64748b;text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid #1e293b;transition:.2s}
+.header a:hover{background:#1e293b;color:#e2e8f0}
+/* Summary Cards */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.card{background:#12151f;border:1px solid #1e293b;border-radius:12px;padding:16px}
+.card .label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:4px}
+.card .value{font-size:22px;font-weight:700}
+.card .value.green{color:#22c55e}
+.card .value.red{color:#ef4444}
+.card .value.blue{color:#00d4ff}
+.card .value.purple{color:#a855f7}
+/* Layout */
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:768px){.row{grid-template-columns:1fr}}
+.form-area,.list-area{background:#12151f;border:1px solid #1e293b;border-radius:12px;padding:20px}
+.form-area h3,.list-area h3{font-size:14px;font-weight:600;color:#94a3b8;margin-bottom:16px;text-transform:uppercase;letter-spacing:.5px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;color:#64748b;margin-bottom:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,select{width:100%;padding:10px 12px;background:#0b0d15;border:1px solid #1e293b;border-radius:8px;color:#e2e8f0;font-size:14px;outline:none;transition:.2s}
+input:focus,select:focus{border-color:#00d4ff;box-shadow:0 0 0 3px rgba(0,212,255,.15)}
+.btn{width:100%;padding:11px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:.3s}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.btn-sm{padding:6px 14px;width:auto;font-size:12px}
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:#64748b;font-weight:500;border-bottom:1px solid #1e293b;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid #151a28}
+tr:hover{background:#151a28}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge.income{background:#22c55e20;color:#22c55e}
+.badge.expense{background:#ef444420;color:#ef4444}
+.badge.saving{background:#00d4ff20;color:#00d4ff}
+.badge.invest{background:#a855f720;color:#a855f7}
+.type-icon{font-size:16px;margin-right:4px}
+.chart-container{height:200px;margin-top:12px}
+.empty{color:#475569;text-align:center;padding:32px;font-size:14px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #1e293b;color:#64748b;background:transparent;transition:.2s}
+.tab.active{background:#00d4ff15;border-color:#00d4ff40;color:#00d4ff}
+.tab:hover{background:#1e293b}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>💰 Finance</h1>
+<div class="links">
+<a href="https://hub.aelflab.com">← Dashboard</a>
+</div>
+</div>
+
+<div class="summary" id="summary">
+<div class="card"><div class="label">💳 Pemasukan</div><div class="value green" id="sumIncome">—</div></div>
+<div class="card"><div class="label">💸 Pengeluaran</div><div class="value red" id="sumExpense">—</div></div>
+<div class="card"><div class="label">🏦 Tabungan</div><div class="value blue" id="sumSaving">—</div></div>
+<div class="card"><div class="label">💰 Saldo</div><div class="value purple" id="sumBalance">—</div></div>
+</div>
+
+<div class="row">
+<div class="form-area">
+<h3>📝 Catat Transaksi</h3>
+<div class="form-group">
+<label>Jenis</label>
+<select id="txType">
+<option value="expense">💸 Pengeluaran</option>
+<option value="income">💳 Pemasukan</option>
+<option value="saving">🏦 Tabungan</option>
+<option value="invest">📈 Investasi</option>
+<option value="transfer">🔄 Transfer</option>
+</select>
+</div>
+<div class="form-row">
+<div class="form-group">
+<label>Jumlah (Rp)</label>
+<input type="number" id="txAmount" placeholder="25000">
+</div>
+<div class="form-group">
+<label>Kategori</label>
+<select id="txCategory"></select>
+</div>
+</div>
+<div class="form-row">
+<div class="form-group">
+<label>Akun</label>
+<select id="txAccount"></select>
+</div>
+<div class="form-group" id="toAccountGroup" style="display:none">
+<label>Ke Akun</label>
+<select id="txAccountTo"></select>
+</div>
+</div>
+<div class="form-group">
+<label>Merchant / Catatan</label>
+<input type="text" id="txNote" placeholder="Kopi Jago, Lottemart, ...">
+</div>
+<button class="btn" onclick="submitTx()">✅ Simpan</button>
+</div>
+
+<div class="list-area">
+<h3>📋 Riwayat</h3>
+<div class="tabs">
+<div class="tab active" onclick="loadTx()">Semua</div>
+<div class="tab" onclick="loadTx('expense')">💸</div>
+<div class="tab" onclick="loadTx('income')">💳</div>
+<div style="flex:1"></div>
+<a href="/api/finance/export" class="tab" style="font-size:11px;color:#00d4ff">⬇ Excel</a>
+</div>
+<div style="max-height:360px;overflow-y:auto">
+<table>
+<thead><tr><th>#</th><th>Tanggal</th><th>Tipe</th><th>Jumlah</th><th>Kategori</th><th>Merchant</th></tr></thead>
+<tbody id="txList"></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="row">
+<div class="list-area">
+<h3>📊 Pengeluaran per Kategori</h3>
+<div class="chart-container"><canvas id="chartCategory"></canvas></div>
+</div>
+<div class="list-area">
+<h3>📈 Portfolio Investasi</h3>
+<div id="portfolioContent" class="empty">Memuat...</div>
+</div>
+</div>
+</div>
+
+<script>
+const API = '/api/finance';
+let catChart = null;
+
+// ── Init ──
+async function init() {
+    await loadCategories();
+    await loadAccounts();
+    await loadSummary();
+    await loadTx();
+    await loadCategoryChart();
+    await loadPortfolio();
+
+    document.getElementById('txType').onchange = toggleTransfer;
+}
+
+async function loadCategories() {
+    const r = await fetch(API+'/categories');
+    const d = await r.json();
+    const sel = document.getElementById('txCategory');
+    sel.innerHTML = d.categories.map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+}
+
+async function loadAccounts() {
+    const r = await fetch(API+'/accounts');
+    const d = await r.json();
+    const html = d.accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+    document.getElementById('txAccount').innerHTML = html;
+    document.getElementById('txAccountTo').innerHTML = html;
+}
+
+function toggleTransfer() {
+    const show = document.getElementById('txType').value === 'transfer';
+    document.getElementById('toAccountGroup').style.display = show ? '' : 'none';
+}
+
+// ── Submit Transaction ──
+async function submitTx() {
+    const data = {
+        type: document.getElementById('txType').value,
+        amount: parseFloat(document.getElementById('txAmount').value) || 0,
+        category: document.getElementById('txCategory').value,
+        account: document.getElementById('txAccount').value,
+        account_to: document.getElementById('txType').value === 'transfer' ? document.getElementById('txAccountTo').value : null,
+        note: document.getElementById('txNote').value,
+    };
+    if (!data.amount) return alert('Masukkan jumlah');
+    try {
+        const r = await fetch(API+'/transactions', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+        const d = await r.json();
+        if (d.status === 'ok') {
+            document.getElementById('txAmount').value = '';
+            document.getElementById('txNote').value = '';
+            await Promise.all([loadSummary(), loadTx(), loadCategoryChart(), loadPortfolio()]);
+        }
+    } catch(e) { alert('Error: '+e); }
+}
+
+// ── Load Transactions ──
+async function loadTx(filter) {
+    const r = await fetch(API+'/transactions?limit=20');
+    const d = await r.json();
+    const types = {'income':'💳','expense':'💸','saving':'🏦','invest':'📈','transfer':'🔄'};
+    const list = document.getElementById('txList');
+    let items = d.transactions;
+    if (filter) items = items.filter(t => t.type === filter);
+    if (!items.length) {
+        list.innerHTML = '<tr><td colspan="6" class="empty">Belum ada transaksi</td></tr>';
+        return;
+    }
+    list.innerHTML = items.map(t => `
+        <tr>
+            <td>${t.id}</td>
+            <td>${t.date}</td>
+            <td><span class="badge ${t.type}">${types[t.type]||'?'} ${t.type}</span></td>
+            <td><strong>Rp${t.amount.toLocaleString()}</strong></td>
+            <td>${t.icon||''} ${t.cat_name||'-'}</td>
+            <td>${t.merchant||'-'}</td>
+        </tr>
+    `).join('');
+}
+
+// ── Summary ──
+async function loadSummary() {
+    const r = await fetch(API+'/summary');
+    const d = await r.json();
+    document.getElementById('sumIncome').textContent = 'Rp'+d.income.toLocaleString();
+    document.getElementById('sumExpense').textContent = 'Rp'+d.expense.toLocaleString();
+    document.getElementById('sumSaving').textContent = 'Rp'+d.saving.toLocaleString();
+    document.getElementById('sumBalance').textContent = 'Rp'+d.balance.toLocaleString();
+}
+
+// ── Category Chart ──
+async function loadCategoryChart() {
+    const r = await fetch(API+'/summary');
+    const d = await r.json();
+    const spending = d.cat_spending;
+    const labels = spending.map(s => s.icon+' '+s.name);
+    const data = spending.map(s => s.total);
+
+    if (catChart) catChart.destroy();
+    const ctx = document.getElementById('chartCategory').getContext('2d');
+    catChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels.length ? labels : ['Belum ada data'],
+            datasets: [{ data: data.length ? data : [1], backgroundColor: ['#00d4ff','#7b2ff7','#22c55e','#ef4444','#f59e0b','#ec4899','#14b8a6','#f97316','#8b5cf6','#06b6d4'], borderWidth: 0 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: {size:11}, boxWidth:12, padding:8 } } }
+        }
+    });
+}
+
+// ── Portfolio ──
+async function loadPortfolio() {
+    const r = await fetch(API+'/portfolio');
+    const d = await r.json();
+    const el = document.getElementById('portfolioContent');
+    if (!d.details || !d.details.length) {
+        el.innerHTML = '<div class="empty">Belum ada investasi</div>';
+        return;
+    }
+    el.innerHTML = `
+        <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap">
+            <div><span style="color:#64748b;font-size:11px">Total Biaya</span><br><strong>Rp${d.total_cost.toLocaleString()}</strong></div>
+            <div><span style="color:#64748b;font-size:11px">Nilai Skrg</span><br><strong>Rp${d.total_current.toLocaleString()}</strong></div>
+            <div><span style="color:#64748b;font-size:11px">Laba/Rugi</span><br><strong style="color:${d.total_pnl >= 0 ? '#22c55e' : '#ef4444'}">${d.total_pnl >= 0 ? '+' : ''}Rp${d.total_pnl.toLocaleString()} (${d.total_pnl_pct >= 0 ? '+' : ''}${d.total_pnl_pct}%)</strong></div>
+        </div>
+        <table>
+            <thead><tr><th>Aset</th><th>Tipe</th><th>Biaya</th><th>Nilai</th><th>L/R</th></tr></thead>
+            <tbody>${d.details.map(i => `
+                <tr>
+                    <td><strong>${i.name}</strong></td>
+                    <td><span style="font-size:11px;color:#64748b">${i.type}</span></td>
+                    <td>Rp${i.cost.toLocaleString()}</td>
+                    <td>Rp${i.current.toLocaleString()}</td>
+                    <td style="color:${i.pnl >= 0 ? '#22c55e' : '#ef4444'}">${i.pnl >=0 ? '+' : ''}Rp${i.pnl.toLocaleString()} (${i.pnl_pct >=0 ? '+' : ''}${i.pnl_pct}%)</td>
+                </tr>
+            `).join('')}</tbody>
+        </table>
+    `;
+}
+
+init();
+</script>
+</body>
+</html>
