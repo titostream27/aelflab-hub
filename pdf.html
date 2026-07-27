@@ -96,6 +96,11 @@ label.fld{display:block;font-size:11px;color:#64748b;margin-bottom:3px}
 .blk:hover .x{display:block}
 .blk-ghost{position:absolute;background:rgba(239,68,68,.28);border:2px dashed #ef4444;z-index:9;pointer-events:none;display:none}
 .coord-note{font-size:10px;color:#475569;font-family:monospace;margin-top:4px}
+
+.api-warn{display:none}
+.api-warn.on{display:block;background:#f59e0b18;border:1px solid #f59e0b;color:#fcd34d;
+  border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.6}
+.api-warn.on code{background:#0b0d15;padding:1px 6px;border-radius:4px;color:#e2e8f0;font-size:11px}
 </style>
 </head>
 <body>
@@ -104,6 +109,8 @@ label.fld{display:block;font-size:11px;color:#64748b;margin-bottom:3px}
 <h1>📄 PDF Editor</h1>
 <a href="https://hub.aelflab.com">← Dashboard</a>
 </div>
+
+<div class="api-warn" id="apiWarn"></div>
 
 <!-- Upload -->
 <div class="card">
@@ -221,6 +228,11 @@ label.fld{display:block;font-size:11px;color:#64748b;margin-bottom:3px}
 
 <script>
 const API='/api/pdf';
+/* Halaman ini butuh kontrak koordinat berbasis header X-Pdf-* yang baru ada
+   di backend 2.1. pdf.html disajikan dari disk, tapi kode Python dimuat saat
+   startup — jadi kalau proses hub belum di-restart setelah update, frontend
+   baru akan bicara dengan backend lama dan endpoint /pages balas 404. */
+const REQUIRED_API='2.1';
 const ZOOM_STEPS=[.25,.35,.5,.75,1,1.25,1.5,2,2.5,3];
 let uploadedFiles=[];
 let allFiles={uploads:[],outputs:[]};
@@ -315,7 +327,13 @@ function makeViewer(mountId,opts){
       await V.render();
       V.buildThumbs();
       V.onPageChange();
-    }catch(e){V.setError('Gagal buka: '+e.message)}
+    }catch(e){
+      // "Not Found" = route-nya tidak ada (backend lama), bukan file-nya hilang.
+      // Backend 2.1 selalu menjawab "File tidak ditemukan: ..." untuk file hilang.
+      V.setError(/not found/i.test(e.message)
+        ? 'Endpoint /pages tidak ada — backend masih versi lama. Restart Scheduled Task AelfLab_Hub.'
+        : 'Gagal buka: '+e.message);
+    }
   };
 
   V.render=async function(){
@@ -920,10 +938,46 @@ window.addEventListener('resize',()=>{
   resizeTimer=setTimeout(()=>{[signV,cenV,outV].forEach(v=>{if(v.file&&v.fit)v.render()})},200);
 });
 
+/* Bandingkan versi bertitik: verLt('2.0','2.1') === true */
+function verLt(a,b){
+  const pa=String(a).split('.').map(n=>parseInt(n)||0);
+  const pb=String(b).split('.').map(n=>parseInt(n)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){
+    const x=pa[i]||0,y=pb[i]||0;
+    if(x!==y)return x<y;
+  }
+  return false;
+}
+
+async function checkBackend(){
+  const el=document.getElementById('apiWarn');
+  let msg=null;
+  try{
+    const r=await fetch(API,{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const v=d.version||'0';
+    if(verLt(v,REQUIRED_API)){
+      msg=`⚠️ <b>Backend PDF masih versi ${esc(v)}</b>, halaman ini butuh ${REQUIRED_API}.<br>`
+        +`Proses FastAPI menjalankan kode lama — file sudah ter-update tapi belum dimuat. `
+        +`Restart dulu: <code>schtasks /End /TN "AelfLab_Hub"</code> lalu `
+        +`<code>schtasks /Run /TN "AelfLab_Hub"</code><br>`
+        +`Preview, signature, dan censor tidak akan bekerja sampai itu dilakukan.`;
+    }
+  }catch(e){
+    msg=`⚠️ Backend PDF tidak merespons (${esc(e.message)}). `
+      +`Pastikan proses hub jalan di port 8081.`;
+  }
+  el.className=msg?'api-warn on':'api-warn';
+  el.innerHTML=msg||'';
+  return !msg;
+}
+
 async function init(){
   setupDragDrop();
   bindCensor();
   setCensorMode('draw');
+  await checkBackend();
   await loadFileList();
 }
 init();

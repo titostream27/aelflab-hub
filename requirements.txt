@@ -1,0 +1,18 @@
+# AelfLab Hub — dependensi backend
+# Install:  python -m pip install -r requirements.txt
+# Versi di bawah adalah yang diverifikasi jalan (Python 3.9+).
+
+# ── Web framework ──
+fastapi==0.128.8
+uvicorn==0.39.0
+pydantic==2.13.4
+python-multipart==0.0.20   # wajib untuk Form()/UploadFile di endpoint PDF
+httpx==0.28.1              # DeepSeek balance, speedtest, notifikasi Telegram
+
+# ── Finance ──
+openpyxl==3.1.5            # GET /api/finance/export (import level modul, wajib ada)
+
+# ── PDF Editor ──
+PyPDF2==3.0.1              # merge & split
+pdfplumber==0.11.8         # ekstraksi teks
+PyMuPDF==1.26.5            # render preview, signature, censor, watermark
