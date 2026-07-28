@@ -50,7 +50,9 @@
 
 ## Podcast Clip Miner
 
+- Langkah aktivasi lengkap ada di CLIP-MINER-SETUP.md pada repo ini. Ikuti berurutan, satu langkah per giliran.
 - Repo terpisah: titostream27/youtube-content-miner. Bukan bagian dari repo Hub.
+- Aplikasinya sudah lengkap di branch main, termasuk Dockerfile dan docker-compose. Jangan membuat ulang dari nol.
 - Fungsi: menambang momen terbaik dari podcast YouTube untuk dijadikan konten short-form.
 - Berjalan sebagai container Docker pada port 8083, bukan native seperti Hub.
 - Port 8083 dipilih mengikuti konvensi lokal: 8081 Hub, 8082 redirect. Port 3000 tidak boleh dipakai karena sudah milik Open WebUI.
