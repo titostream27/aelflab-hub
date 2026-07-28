@@ -24,6 +24,13 @@ HUB_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = HUB_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
+# Podcast Clip Miner runs as its own service, not inside this process: it is a
+# Next.js app with its own SQLite database, so it cannot be mounted as a router
+# the way finance and pdf are. The Hub treats it as a launcher entry plus a
+# health probe. Port 8083 continues the local convention (8081 Hub,
+# 8082 redirect); 3000 is already taken by Open WebUI.
+MINER_URL = os.environ.get("MINER_URL", "http://127.0.0.1:8083")
+
 # ── Helpers ──────────────────────────────────────
 
 def run_pwsh(script: str) -> str:
@@ -103,6 +110,28 @@ def get_secret(name: str) -> str:
 
 def get_dk_key() -> str:
     return get_secret("DEEPSEEK_API_KEY")
+
+
+async def miner_health() -> str:
+    """One-line status for the Clip Miner, read from its own /api/health.
+
+    Returns a clip count when reachable, because "how many clips are waiting"
+    is the only number worth a slot on the dashboard. Never raises - a stopped
+    service must not break the Hub status endpoint.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=4) as client:
+            resp = await client.get(f"{MINER_URL}/api/health")
+            if resp.status_code != 200:
+                return "Offline"
+            data = resp.json()
+            clips = data.get("library", {}).get("clipsInLibrary", 0)
+            # Surface demo mode: without a YouTube key the pipeline serves a
+            # synthetic catalogue, which is easy to mistake for real results.
+            suffix = " (demo)" if data.get("discovery") == "demo" else ""
+            return f"{clips} clip{'s' if clips != 1 else ''}{suffix}"
+    except Exception:
+        return "Offline"
 
 
 def run_pwsh_file(script_name: str) -> str:
@@ -213,8 +242,11 @@ async def api_status():
         except:
             uptime = uptime_out
 
+    miner_status = await miner_health()
+
     result = {
         "deepseek_balance": deepseek_balance,
+        "miner": miner_status,
         "disk_free": disk_free, "disk_total": disk_total,
         "disk_free_gb": disk_free_gb, "disk_total_gb": disk_total_gb,
         "memory_used": mem_used, "memory_total": mem_total, "mem_pct": mem_pct,
@@ -324,6 +356,13 @@ async def serve_finance():
 @app.get("/pdf")
 async def serve_pdf():
     return FileResponse(HUB_DIR / "pdf.html")
+
+@app.get("/miner")
+async def serve_miner():
+    # Unlike /finance and /pdf, this cannot be served from a file: the Clip
+    # Miner is a separate Next.js process. Redirect to its own hostname so the
+    # Hub stays a launcher and does not become a reverse proxy.
+    return RedirectResponse("https://miner.aelflab.com", status_code=307)
 
 
 # ── Cron Manager ────────────────────────────────
