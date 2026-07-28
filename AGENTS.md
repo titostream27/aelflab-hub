@@ -46,3 +46,26 @@
 - Jika subprocess berhasil di terminal tetapi gagal dari FastAPI, periksa perbedaan PATH dan virtual environment.
 - Gunakan absolute path executable atau Python venv; jangan mengandalkan bare "python".
 - Gunakan timeout minimal 120 detik untuk operasi berbasis LLM.
+
+
+## Podcast Clip Miner
+
+- Repo terpisah: titostream27/youtube-content-miner. Bukan bagian dari repo Hub.
+- Fungsi: menambang momen terbaik dari podcast YouTube untuk dijadikan konten short-form.
+- Berjalan sebagai container Docker pada port 8083, bukan native seperti Hub.
+- Port 8083 dipilih mengikuti konvensi lokal: 8081 Hub, 8082 redirect. Port 3000 tidak boleh dipakai karena sudah milik Open WebUI.
+- Tidak di-mount sebagai router di dalam proses FastAPI Hub. Aplikasinya Next.js dengan database SQLite sendiri, sehingga pola finance dan pdf tidak berlaku.
+- Hub berperan sebagai launcher: satu kartu di appGrid menuju https://miner.aelflab.com, dan satu baris monitoring yang membaca GET http://127.0.0.1:8083/api/health.
+- Path /miner pada Hub mengembalikan redirect 307 ke subdomain, bukan FileResponse. Hub tidak menjadi reverse proxy.
+- Alamat service dapat dioverride dengan environment variable MINER_URL.
+- Probe health tidak boleh melempar exception. Jika container mati, monitoring menampilkan "Offline" dan endpoint /api/status tetap berhasil.
+- Status yang mengandung "(demo)" berarti YOUTUBE_API_KEY belum diisi dan pipeline sedang menyajikan katalog sintetis, bukan podcast sungguhan.
+- Database berada pada volume Docker, bukan pada layer image. Tabel clip_feedback tidak dapat dibuat ulang dan wajib masuk rencana backup.
+- Discovery terjadwal menggunakan CLI di dalam container melalui Windows Scheduled Task, mengikuti pola AelfLab_Hub dan AelfLab_Redirect. Jangan memakai HTTP untuk pekerjaan terjadwal karena route memiliki batas 300 detik.
+- Uji jalur transcript gratis lebih dulu sebelum menyarankan vendor berbayar. Homelab memakai IP residensial, sedangkan pemblokiran YouTube yang terukur bersifat khusus IP datacenter.
+
+### Belum terverifikasi untuk Clip Miner
+
+- Route tunnel miner.aelflab.com ke port 8083 belum dibuat. Tambahkan dengan "cloudflared tunnel route dns <tunnel-id> miner.aelflab.com", lalu salin konfigurasi user ke konfigurasi service dan restart cloudflared.
+- Policy Cloudflare Access untuk miner.aelflab.com belum dikonfirmasi. Ini lebih penting daripada pada finance dan pdf: Clip Miner memiliki endpoint tulis PUT /api/settings/transcript yang menyimpan API key vendor, dan POST /api/runs yang menghabiskan kredit AI serta kuota YouTube. Verifikasi policy sebelum hostname diekspos.
+- Selama policy Access belum dikonfirmasi, aktifkan HTTP Basic auth bawaan aplikasi sebagai lapisan sementara dengan APP_BASIC_AUTH_USER dan APP_BASIC_AUTH_PASSWORD. Nonaktif secara default dan bukan pengganti Cloudflare Access.
